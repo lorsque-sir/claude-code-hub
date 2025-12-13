@@ -284,8 +284,18 @@ export async function updateErrorRuleAction(
       };
     }
 
-    // 直接使用 updates，不做额外处理
-    const processedUpdates = updates;
+    // 复制 updates，以便在需要时调整 isDefault 字段
+    const processedUpdates: typeof updates & { isDefault?: boolean } = {
+      ...updates,
+    };
+
+    // 如果是默认规则，编辑时自动转换为自定义规则
+    // 这样用户的修改不会被"同步规则"操作覆盖
+    let convertedFromDefault = false;
+    if (currentRule.isDefault) {
+      processedUpdates.isDefault = false;
+      convertedFromDefault = true;
+    }
 
     const result = await repo.updateErrorRule(id, processedUpdates);
 
@@ -303,9 +313,17 @@ export async function updateErrorRuleAction(
 
     revalidatePath("/settings/error-rules");
 
+    if (convertedFromDefault) {
+      logger.info("[ErrorRulesAction] Converted default rule to custom on edit", {
+        id,
+        userId: session.user.id,
+      });
+    }
+
     logger.info("[ErrorRulesAction] Updated error rule", {
       id,
       updates,
+      convertedFromDefault,
       userId: session.user.id,
     });
 
@@ -369,13 +387,17 @@ export async function deleteErrorRuleAction(id: number): Promise<ActionResult> {
 /**
  * 手动刷新缓存
  *
- * 同时同步默认规则到数据库：
- * - 删除所有已有的默认规则（isDefault=true）
- * - 重新插入最新的默认规则
- * - 用户自定义规则（isDefault=false）保持不变
+ * 同时同步默认规则到数据库，采用"用户自定义优先"策略：
+ * - pattern 不存在：插入新规则
+ * - pattern 存在且 isDefault=true：更新为最新默认规则
+ * - pattern 存在且 isDefault=false：跳过（保留用户的自定义版本）
+ * - 不再存在于 DEFAULT_ERROR_RULES 中的默认规则：删除
  */
 export async function refreshCacheAction(): Promise<
-  ActionResult<{ stats: ReturnType<typeof errorRuleDetector.getStats>; syncedCount: number }>
+  ActionResult<{
+    stats: ReturnType<typeof errorRuleDetector.getStats>;
+    syncResult: { inserted: number; updated: number; skipped: number; deleted: number };
+  }>
 > {
   try {
     const session = await getSession();
@@ -387,7 +409,7 @@ export async function refreshCacheAction(): Promise<
     }
 
     // 1. 同步默认规则到数据库
-    const syncedCount = await repo.syncDefaultErrorRules();
+    const syncResult = await repo.syncDefaultErrorRules();
 
     // 2. 重新加载缓存
     await errorRuleDetector.reload();
@@ -395,7 +417,7 @@ export async function refreshCacheAction(): Promise<
     const stats = errorRuleDetector.getStats();
 
     logger.info("[ErrorRulesAction] Default rules synced and cache refreshed", {
-      syncedCount,
+      syncResult,
       stats,
       userId: session.user.id,
     });
@@ -405,7 +427,7 @@ export async function refreshCacheAction(): Promise<
 
     return {
       ok: true,
-      data: { stats, syncedCount },
+      data: { stats, syncResult },
     };
   } catch (error) {
     logger.error("[ErrorRulesAction] Failed to sync rules and refresh cache:", error);
@@ -563,6 +585,9 @@ export async function testErrorRuleAction(input: { message: string }): Promise<
 
 /**
  * 获取缓存统计信息
+ *
+ * 注意：此函数会确保缓存已初始化（懒加载），
+ * 避免在新的 worker 进程中返回空统计信息
  */
 export async function getCacheStats() {
   try {
@@ -570,6 +595,10 @@ export async function getCacheStats() {
     if (!session || session.user.role !== "admin") {
       return null;
     }
+
+    // 确保缓存已初始化（懒加载）
+    // 解决重启后新 worker 进程中缓存为空的问题
+    await errorRuleDetector.ensureInitialized();
 
     return errorRuleDetector.getStats();
   } catch (error) {

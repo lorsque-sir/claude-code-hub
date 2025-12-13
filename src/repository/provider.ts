@@ -20,6 +20,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
       providerData.cost_multiplier != null ? providerData.cost_multiplier.toString() : "1.0",
     groupTag: providerData.group_tag,
     providerType: providerData.provider_type,
+    preserveClientIp: providerData.preserve_client_ip ?? false,
     modelRedirects: providerData.model_redirects,
     allowedModels: providerData.allowed_models,
     joinClaudePool: providerData.join_claude_pool ?? false,
@@ -48,6 +49,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     requestTimeoutNonStreamingMs: providerData.request_timeout_non_streaming_ms ?? 600000,
     websiteUrl: providerData.website_url ?? null,
     faviconUrl: providerData.favicon_url ?? null,
+    cacheTtlPreference: providerData.cache_ttl_preference ?? null,
     tpm: providerData.tpm,
     rpm: providerData.rpm,
     rpd: providerData.rpd,
@@ -65,6 +67,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     costMultiplier: providers.costMultiplier,
     groupTag: providers.groupTag,
     providerType: providers.providerType,
+    preserveClientIp: providers.preserveClientIp,
     modelRedirects: providers.modelRedirects,
     allowedModels: providers.allowedModels,
     joinClaudePool: providers.joinClaudePool,
@@ -89,6 +92,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     requestTimeoutNonStreamingMs: providers.requestTimeoutNonStreamingMs,
     websiteUrl: providers.websiteUrl,
     faviconUrl: providers.faviconUrl,
+    cacheTtlPreference: providers.cacheTtlPreference,
     tpm: providers.tpm,
     rpm: providers.rpm,
     rpd: providers.rpd,
@@ -117,6 +121,7 @@ export async function findProviderList(
       costMultiplier: providers.costMultiplier,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
+      preserveClientIp: providers.preserveClientIp,
       modelRedirects: providers.modelRedirects,
       allowedModels: providers.allowedModels,
       joinClaudePool: providers.joinClaudePool,
@@ -141,6 +146,7 @@ export async function findProviderList(
       requestTimeoutNonStreamingMs: providers.requestTimeoutNonStreamingMs,
       websiteUrl: providers.websiteUrl,
       faviconUrl: providers.faviconUrl,
+      cacheTtlPreference: providers.cacheTtlPreference,
       tpm: providers.tpm,
       rpm: providers.rpm,
       rpd: providers.rpd,
@@ -180,6 +186,7 @@ export async function findAllProviders(): Promise<Provider[]> {
       costMultiplier: providers.costMultiplier,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
+      preserveClientIp: providers.preserveClientIp,
       modelRedirects: providers.modelRedirects,
       allowedModels: providers.allowedModels,
       joinClaudePool: providers.joinClaudePool,
@@ -204,6 +211,7 @@ export async function findAllProviders(): Promise<Provider[]> {
       requestTimeoutNonStreamingMs: providers.requestTimeoutNonStreamingMs,
       websiteUrl: providers.websiteUrl,
       faviconUrl: providers.faviconUrl,
+      cacheTtlPreference: providers.cacheTtlPreference,
       tpm: providers.tpm,
       rpm: providers.rpm,
       rpd: providers.rpd,
@@ -237,6 +245,7 @@ export async function findProviderById(id: number): Promise<Provider | null> {
       costMultiplier: providers.costMultiplier,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
+      preserveClientIp: providers.preserveClientIp,
       modelRedirects: providers.modelRedirects,
       allowedModels: providers.allowedModels,
       joinClaudePool: providers.joinClaudePool,
@@ -261,6 +270,7 @@ export async function findProviderById(id: number): Promise<Provider | null> {
       requestTimeoutNonStreamingMs: providers.requestTimeoutNonStreamingMs,
       websiteUrl: providers.websiteUrl,
       faviconUrl: providers.faviconUrl,
+      cacheTtlPreference: providers.cacheTtlPreference,
       tpm: providers.tpm,
       rpm: providers.rpm,
       rpd: providers.rpd,
@@ -299,6 +309,8 @@ export async function updateProvider(
       providerData.cost_multiplier != null ? providerData.cost_multiplier.toString() : "1.0";
   if (providerData.group_tag !== undefined) dbData.groupTag = providerData.group_tag;
   if (providerData.provider_type !== undefined) dbData.providerType = providerData.provider_type;
+  if (providerData.preserve_client_ip !== undefined)
+    dbData.preserveClientIp = providerData.preserve_client_ip;
   if (providerData.model_redirects !== undefined)
     dbData.modelRedirects = providerData.model_redirects;
   if (providerData.allowed_models !== undefined) dbData.allowedModels = providerData.allowed_models;
@@ -348,6 +360,8 @@ export async function updateProvider(
     dbData.requestTimeoutNonStreamingMs = providerData.request_timeout_non_streaming_ms;
   if (providerData.website_url !== undefined) dbData.websiteUrl = providerData.website_url;
   if (providerData.favicon_url !== undefined) dbData.faviconUrl = providerData.favicon_url;
+  if (providerData.cache_ttl_preference !== undefined)
+    dbData.cacheTtlPreference = providerData.cache_ttl_preference ?? null;
   if (providerData.tpm !== undefined) dbData.tpm = providerData.tpm;
   if (providerData.rpm !== undefined) dbData.rpm = providerData.rpm;
   if (providerData.rpd !== undefined) dbData.rpd = providerData.rpd;
@@ -368,6 +382,7 @@ export async function updateProvider(
       costMultiplier: providers.costMultiplier,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
+      preserveClientIp: providers.preserveClientIp,
       modelRedirects: providers.modelRedirects,
       allowedModels: providers.allowedModels,
       joinClaudePool: providers.joinClaudePool,
@@ -392,6 +407,7 @@ export async function updateProvider(
       requestTimeoutNonStreamingMs: providers.requestTimeoutNonStreamingMs,
       websiteUrl: providers.websiteUrl,
       faviconUrl: providers.faviconUrl,
+      cacheTtlPreference: providers.cacheTtlPreference,
       tpm: providers.tpm,
       rpm: providers.rpm,
       rpd: providers.rpd,

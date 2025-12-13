@@ -34,6 +34,7 @@ import {
   getProviderStatistics,
   updateProvider,
 } from "@/repository/provider";
+import type { CacheTtlPreference } from "@/types/cache";
 import type { ProviderDisplay, ProviderType } from "@/types/provider";
 import type { ActionResult } from "./types";
 
@@ -180,6 +181,7 @@ export async function getProviders(): Promise<ProviderDisplay[]> {
         costMultiplier: provider.costMultiplier,
         groupTag: provider.groupTag,
         providerType: provider.providerType,
+        preserveClientIp: provider.preserveClientIp,
         modelRedirects: provider.modelRedirects,
         allowedModels: provider.allowedModels,
         joinClaudePool: provider.joinClaudePool,
@@ -204,6 +206,7 @@ export async function getProviders(): Promise<ProviderDisplay[]> {
         requestTimeoutNonStreamingMs: provider.requestTimeoutNonStreamingMs,
         websiteUrl: provider.websiteUrl,
         faviconUrl: provider.faviconUrl,
+        cacheTtlPreference: provider.cacheTtlPreference,
         tpm: provider.tpm,
         rpm: provider.rpm,
         rpd: provider.rpd,
@@ -233,10 +236,38 @@ export async function getProviders(): Promise<ProviderDisplay[]> {
 /**
  * 获取所有可用的供应商分组标签（用于用户表单中的下拉建议）
  */
-export async function getAvailableProviderGroups(): Promise<string[]> {
+/**
+ * 获取所有可用的供应商分组列表
+ * @param userId - 可选的用户ID，用于过滤用户可用的分组
+ * @returns 供应商分组列表
+ */
+export async function getAvailableProviderGroups(userId?: number): Promise<string[]> {
   try {
     const { getDistinctProviderGroups } = await import("@/repository/provider");
-    return await getDistinctProviderGroups();
+    const allGroups = await getDistinctProviderGroups();
+
+    // 如果没有提供 userId，返回所有分组（向后兼容）
+    if (!userId) {
+      return allGroups;
+    }
+
+    // 查询用户配置的 providerGroup
+    const { findUserById } = await import("@/repository/user");
+    const user = await findUserById(userId);
+
+    if (!user || !user.providerGroup) {
+      // 用户未配置 providerGroup，返回所有分组
+      return allGroups;
+    }
+
+    // 解析用户的 providerGroup（逗号分隔）
+    const userGroups = user.providerGroup
+      .split(",")
+      .map((g) => g.trim())
+      .filter(Boolean);
+
+    // 过滤：只返回用户配置的分组
+    return allGroups.filter((group) => userGroups.includes(group));
   } catch (error) {
     logger.error("获取供应商分组失败:", error);
     return [];
@@ -254,6 +285,7 @@ export async function addProvider(data: {
   cost_multiplier?: number;
   group_tag?: string | null;
   provider_type?: ProviderType;
+  preserve_client_ip?: boolean;
   model_redirects?: Record<string, string> | null;
   allowed_models?: string[] | null;
   join_claude_pool?: boolean;
@@ -264,6 +296,7 @@ export async function addProvider(data: {
   limit_weekly_usd?: number | null;
   limit_monthly_usd?: number | null;
   limit_concurrent_sessions?: number | null;
+  cache_ttl_preference?: CacheTtlPreference | null;
   max_retry_attempts?: number | null;
   circuit_breaker_failure_threshold?: number;
   circuit_breaker_open_duration?: number;
@@ -347,6 +380,7 @@ export async function addProvider(data: {
       request_timeout_non_streaming_ms:
         validated.request_timeout_non_streaming_ms ??
         PROVIDER_TIMEOUT_DEFAULTS.REQUEST_TIMEOUT_NON_STREAMING_MS,
+      cache_ttl_preference: validated.cache_ttl_preference ?? "inherit",
       website_url: validated.website_url ?? null,
       favicon_url: faviconUrl,
       tpm: validated.tpm ?? null,
@@ -402,6 +436,7 @@ export async function editProvider(
     cost_multiplier?: number;
     group_tag?: string | null;
     provider_type?: ProviderType;
+    preserve_client_ip?: boolean;
     model_redirects?: Record<string, string> | null;
     allowed_models?: string[] | null;
     join_claude_pool?: boolean;
@@ -411,6 +446,7 @@ export async function editProvider(
     limit_weekly_usd?: number | null;
     limit_monthly_usd?: number | null;
     limit_concurrent_sessions?: number | null;
+    cache_ttl_preference?: "inherit" | "5m" | "1h";
     max_retry_attempts?: number | null;
     circuit_breaker_failure_threshold?: number;
     circuit_breaker_open_duration?: number;
@@ -1177,7 +1213,7 @@ function extractFirstTextSnippet(
   return undefined;
 }
 
-function clipText(value: unknown, maxLength?: number): string | undefined {
+function clipText(value: unknown, maxLength = 500): string | undefined {
   const limit = maxLength ?? API_TEST_CONFIG.MAX_RESPONSE_PREVIEW_LENGTH;
   return typeof value === "string" ? value.substring(0, limit) : undefined;
 }
@@ -1216,7 +1252,7 @@ function extractErrorMessage(errorJson: unknown): string | undefined {
 
     // 尝试从 upstream_error.error.message 提取
     const nestedMessage = normalizeErrorValue(
-      (upstreamErrorObj.error as { message?: unknown } | undefined)?.message
+      (upstreamErrorObj.error as Record<string, unknown> | undefined)?.message
     );
     if (nestedMessage) {
       return nestedMessage;

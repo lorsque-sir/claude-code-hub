@@ -1,4 +1,6 @@
 // 供应商类型枚举
+import type { CacheTtlPreference } from "./cache";
+
 export type ProviderType =
   | "claude"
   | "claude-auth"
@@ -30,6 +32,8 @@ export interface Provider {
 
   // 供应商类型：扩展支持 4 种类型
   providerType: ProviderType;
+  // 是否透传客户端 IP
+  preserveClientIp: boolean;
   modelRedirects: Record<string, string> | null;
 
   // 模型列表：双重语义
@@ -85,6 +89,9 @@ export interface Provider {
   websiteUrl: string | null;
   faviconUrl: string | null;
 
+  // Cache TTL override（inherit 表示不强制覆写）
+  cacheTtlPreference: CacheTtlPreference | null;
+
   // 废弃（保留向后兼容，但不再使用）
   // TPM (Tokens Per Minute): 每分钟可处理的文本总量
   tpm: number | null;
@@ -114,6 +121,8 @@ export interface ProviderDisplay {
   groupTag: string | null;
   // 供应商类型
   providerType: ProviderType;
+  // 是否透传客户端 IP
+  preserveClientIp: boolean;
   modelRedirects: Record<string, string> | null;
   // 模型列表（双重语义）
   allowedModels: string[] | null;
@@ -148,6 +157,7 @@ export interface ProviderDisplay {
   // 供应商官网地址
   websiteUrl: string | null;
   faviconUrl: string | null;
+  cacheTtlPreference: CacheTtlPreference | null;
   // 废弃字段（保留向后兼容）
   tpm: number | null;
   rpm: number | null;
@@ -178,6 +188,7 @@ export interface CreateProviderData {
 
   // 供应商类型和模型配置
   provider_type?: ProviderType;
+  preserve_client_ip?: boolean;
   model_redirects?: Record<string, string> | null;
   allowed_models?: string[] | null;
   join_claude_pool?: boolean;
@@ -212,6 +223,7 @@ export interface CreateProviderData {
   // 供应商官网地址
   website_url?: string | null;
   favicon_url?: string | null;
+  cache_ttl_preference?: CacheTtlPreference | null;
 
   // 废弃字段（保留向后兼容）
   // TPM (Tokens Per Minute): 每分钟可处理的文本总量
@@ -240,6 +252,7 @@ export interface UpdateProviderData {
 
   // 供应商类型和模型配置
   provider_type?: ProviderType;
+  preserve_client_ip?: boolean;
   model_redirects?: Record<string, string> | null;
   allowed_models?: string[] | null;
   join_claude_pool?: boolean;
@@ -274,6 +287,7 @@ export interface UpdateProviderData {
   // 供应商官网地址
   website_url?: string | null;
   favicon_url?: string | null;
+  cache_ttl_preference?: CacheTtlPreference | null;
 
   // 废弃字段（保留向后兼容）
   // TPM (Tokens Per Minute): 每分钟可处理的文本总量

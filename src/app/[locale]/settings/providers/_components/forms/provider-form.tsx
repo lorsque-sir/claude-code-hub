@@ -79,6 +79,9 @@ export function ProviderForm({
   const [providerType, setProviderType] = useState<ProviderType>(
     sourceProvider?.providerType ?? "claude"
   );
+  const [preserveClientIp, setPreserveClientIp] = useState<boolean>(
+    sourceProvider?.preserveClientIp ?? false
+  );
   const [modelRedirects, setModelRedirects] = useState<Record<string, string>>(
     sourceProvider?.modelRedirects ?? {}
   );
@@ -117,6 +120,9 @@ export function ProviderForm({
   const [allowedModels, setAllowedModels] = useState<string[]>(sourceProvider?.allowedModels ?? []);
   const [joinClaudePool, setJoinClaudePool] = useState<boolean>(
     sourceProvider?.joinClaudePool ?? false
+  );
+  const [cacheTtlPreference, setCacheTtlPreference] = useState<"inherit" | "5m" | "1h">(
+    sourceProvider?.cacheTtlPreference ?? "inherit"
   );
 
   // 熔断器配置（以分钟为单位显示，提交时转换为毫秒）
@@ -302,6 +308,7 @@ export function ProviderForm({
             limit_weekly_usd?: number | null;
             limit_monthly_usd?: number | null;
             limit_concurrent_sessions?: number | null;
+            cache_ttl_preference?: "inherit" | "5m" | "1h";
             max_retry_attempts?: number | null;
             circuit_breaker_failure_threshold?: number;
             circuit_breaker_open_duration?: number;
@@ -315,6 +322,7 @@ export function ProviderForm({
             codex_instructions_strategy?: CodexInstructionsStrategy;
             mcp_passthrough_type?: McpPassthroughType;
             mcp_passthrough_url?: string | null;
+            preserve_client_ip?: boolean;
             tpm?: number | null;
             rpm?: number | null;
             rpd?: number | null;
@@ -323,6 +331,7 @@ export function ProviderForm({
             name: name.trim(),
             url: url.trim(),
             provider_type: providerType,
+            preserve_client_ip: preserveClientIp,
             model_redirects: parsedModelRedirects,
             allowed_models: allowedModels.length > 0 ? allowedModels : null,
             join_claude_pool: joinClaudePool,
@@ -337,6 +346,7 @@ export function ProviderForm({
             limit_weekly_usd: limitWeeklyUsd,
             limit_monthly_usd: limitMonthlyUsd,
             limit_concurrent_sessions: limitConcurrentSessions,
+            cache_ttl_preference: cacheTtlPreference,
             max_retry_attempts: maxRetryAttempts,
             circuit_breaker_failure_threshold: failureThreshold ?? 5,
             circuit_breaker_open_duration: openDurationMinutes
@@ -379,6 +389,7 @@ export function ProviderForm({
             url: url.trim(),
             key: key.trim(),
             provider_type: providerType,
+            preserve_client_ip: preserveClientIp,
             model_redirects: parsedModelRedirects,
             allowed_models: allowedModels.length > 0 ? allowedModels : null,
             join_claude_pool: joinClaudePool,
@@ -395,6 +406,7 @@ export function ProviderForm({
             limit_weekly_usd: limitWeeklyUsd,
             limit_monthly_usd: limitMonthlyUsd,
             limit_concurrent_sessions: limitConcurrentSessions ?? 0,
+            cache_ttl_preference: cacheTtlPreference,
             max_retry_attempts: maxRetryAttempts,
             circuit_breaker_failure_threshold: failureThreshold ?? 5,
             circuit_breaker_open_duration: openDurationMinutes
@@ -437,6 +449,7 @@ export function ProviderForm({
           setUrl("");
           setKey("");
           setProviderType("claude");
+          setPreserveClientIp(false);
           setModelRedirects({});
           setAllowedModels([]);
           setJoinClaudePool(false);
@@ -641,6 +654,28 @@ export function ProviderForm({
                       {t("sections.routing.providerTypeDisabledNote")}
                     </span>
                   )}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor={isEdit ? "edit-preserve-client-ip" : "preserve-client-ip"}>
+                      {t("sections.routing.preserveClientIp.label")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t("sections.routing.preserveClientIp.desc")}
+                    </p>
+                  </div>
+                  <Switch
+                    id={isEdit ? "edit-preserve-client-ip" : "preserve-client-ip"}
+                    checked={preserveClientIp}
+                    onCheckedChange={setPreserveClientIp}
+                    disabled={isPending}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("sections.routing.preserveClientIp.help")}
                 </p>
               </div>
 
@@ -851,6 +886,26 @@ export function ProviderForm({
                   />
                   <p className="text-xs text-muted-foreground">
                     {t("sections.routing.scheduleParams.group.desc")}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Cache TTL 覆写</Label>
+                  <Select
+                    value={cacheTtlPreference}
+                    onValueChange={(val) => setCacheTtlPreference(val as "inherit" | "5m" | "1h")}
+                    disabled={isPending}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="inherit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit">不覆写（跟随客户端）</SelectItem>
+                      <SelectItem value="5m">5m</SelectItem>
+                      <SelectItem value="1h">1h</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    强制设置 prompt cache TTL；仅影响包含 cache_control 的请求。
                   </p>
                 </div>
               </div>

@@ -26,6 +26,9 @@ export type UsageMetrics = {
   input_tokens?: number;
   output_tokens?: number;
   cache_creation_input_tokens?: number;
+  cache_creation_5m_input_tokens?: number;
+  cache_creation_1h_input_tokens?: number;
+  cache_ttl?: "5m" | "1h" | "mixed";
   cache_read_input_tokens?: number;
 };
 
@@ -98,11 +101,13 @@ export class ProxyResponseHandler {
 
             // 存储响应体到 Redis（5分钟过期）
             if (session.sessionId) {
-              void SessionManager.storeSessionResponse(session.sessionId, responseText).catch(
-                (err) => {
-                  logger.error("[ResponseHandler] Failed to store response:", err);
-                }
-              );
+              void SessionManager.storeSessionResponse(
+                session.sessionId,
+                responseText,
+                session.requestSequence
+              ).catch((err) => {
+                logger.error("[ResponseHandler] Failed to store response:", err);
+              });
             }
 
             // 使用共享的统计处理方法
@@ -284,7 +289,11 @@ export class ProxyResponseHandler {
 
         // 存储响应体到 Redis（5分钟过期）
         if (session.sessionId) {
-          void SessionManager.storeSessionResponse(session.sessionId, responseText).catch((err) => {
+          void SessionManager.storeSessionResponse(
+            session.sessionId,
+            responseText,
+            session.requestSequence
+          ).catch((err) => {
             logger.error("[ResponseHandler] Failed to store response:", err);
           });
         }
@@ -344,6 +353,9 @@ export class ProxyResponseHandler {
             outputTokens: usageMetrics?.output_tokens,
             cacheCreationInputTokens: usageMetrics?.cache_creation_input_tokens,
             cacheReadInputTokens: usageMetrics?.cache_read_input_tokens,
+            cacheCreation5mInputTokens: usageMetrics?.cache_creation_5m_input_tokens,
+            cacheCreation1hInputTokens: usageMetrics?.cache_creation_1h_input_tokens,
+            cacheTtlApplied: usageMetrics?.cache_ttl ?? null,
             providerChain: session.getProviderChain(),
             model: session.getCurrentModel() ?? undefined, // ⭐ 更新重定向后的模型
             providerId: session.provider?.id, // ⭐ 更新最终供应商ID（重试切换后）
@@ -526,6 +538,21 @@ export class ProxyResponseHandler {
           }
         );
 
+        // ⭐ gemini 透传立即清除首字节超时：透传路径收到响应即视为首字节到达
+        const sessionWithCleanup = session as typeof session & {
+          clearResponseTimeout?: () => void;
+        };
+        if (sessionWithCleanup.clearResponseTimeout) {
+          sessionWithCleanup.clearResponseTimeout();
+          logger.debug(
+            "[ResponseHandler] Gemini passthrough: First byte timeout cleared on response received",
+            {
+              providerId: provider.id,
+              providerName: provider.name,
+            }
+          );
+        }
+
         const responseForStats = response.clone();
         const statusCode = response.status;
 
@@ -554,14 +581,13 @@ export class ProxyResponseHandler {
 
             // 存储响应体到 Redis（5分钟过期）
             if (session.sessionId) {
-              void SessionManager.storeSessionResponse(session.sessionId, allContent).catch(
-                (err) => {
-                  logger.error(
-                    "[ResponseHandler] Failed to store stream passthrough response:",
-                    err
-                  );
-                }
-              );
+              void SessionManager.storeSessionResponse(
+                session.sessionId,
+                allContent,
+                session.requestSequence
+              ).catch((err) => {
+                logger.error("[ResponseHandler] Failed to store stream passthrough response:", err);
+              });
             }
 
             // 使用共享的统计处理方法
@@ -782,7 +808,11 @@ export class ProxyResponseHandler {
       const finalizeStream = async (allContent: string): Promise<void> => {
         // 存储响应体到 Redis（5分钟过期）
         if (session.sessionId) {
-          void SessionManager.storeSessionResponse(session.sessionId, allContent).catch((err) => {
+          void SessionManager.storeSessionResponse(
+            session.sessionId,
+            allContent,
+            session.requestSequence
+          ).catch((err) => {
             logger.error("[ResponseHandler] Failed to store stream response:", err);
           });
         }
@@ -870,6 +900,9 @@ export class ProxyResponseHandler {
           outputTokens: usageForCost?.output_tokens,
           cacheCreationInputTokens: usageForCost?.cache_creation_input_tokens,
           cacheReadInputTokens: usageForCost?.cache_read_input_tokens,
+          cacheCreation5mInputTokens: usageForCost?.cache_creation_5m_input_tokens,
+          cacheCreation1hInputTokens: usageForCost?.cache_creation_1h_input_tokens,
+          cacheTtlApplied: usageForCost?.cache_ttl ?? null,
           providerChain: session.getProviderChain(),
           model: session.getCurrentModel() ?? undefined, // ⭐ 更新重定向后的模型
           providerId: session.provider?.id, // ⭐ 更新最终供应商ID（重试切换后）
@@ -1080,7 +1113,10 @@ export class ProxyResponseHandler {
         try {
           reader.releaseLock();
         } catch (releaseError) {
-          logger.warn("Failed to release reader lock", { taskId, releaseError });
+          logger.warn("Failed to release reader lock", {
+            taskId,
+            releaseError,
+          });
         }
         AsyncTaskManager.cleanup(taskId);
       }
@@ -1179,6 +1215,36 @@ function extractUsageMetrics(value: unknown): UsageMetrics | null {
   if (typeof usage.cache_creation_input_tokens === "number") {
     result.cache_creation_input_tokens = usage.cache_creation_input_tokens;
     hasAny = true;
+  }
+
+  const cacheCreationDetails = usage.cache_creation as Record<string, unknown> | undefined;
+  let cacheCreationDetailedTotal = 0;
+
+  if (cacheCreationDetails) {
+    if (typeof cacheCreationDetails.ephemeral_5m_input_tokens === "number") {
+      result.cache_creation_5m_input_tokens = cacheCreationDetails.ephemeral_5m_input_tokens;
+      cacheCreationDetailedTotal += cacheCreationDetails.ephemeral_5m_input_tokens;
+      hasAny = true;
+    }
+    if (typeof cacheCreationDetails.ephemeral_1h_input_tokens === "number") {
+      result.cache_creation_1h_input_tokens = cacheCreationDetails.ephemeral_1h_input_tokens;
+      cacheCreationDetailedTotal += cacheCreationDetails.ephemeral_1h_input_tokens;
+      hasAny = true;
+    }
+  }
+
+  if (result.cache_creation_input_tokens === undefined && cacheCreationDetailedTotal > 0) {
+    result.cache_creation_input_tokens = cacheCreationDetailedTotal;
+  }
+
+  if (!result.cache_ttl) {
+    if (result.cache_creation_1h_input_tokens && result.cache_creation_5m_input_tokens) {
+      result.cache_ttl = "mixed";
+    } else if (result.cache_creation_1h_input_tokens) {
+      result.cache_ttl = "1h";
+    } else if (result.cache_creation_5m_input_tokens) {
+      result.cache_ttl = "5m";
+    }
   }
 
   // Claude 格式：顶层 cache_read_input_tokens（扁平结构）
@@ -1289,29 +1355,85 @@ function parseUsageFromResponseText(
   // 2. 纯 data: 格式 - Gemini
   if (!usageMetrics && responseText.includes("data:")) {
     const events = parseSSEData(responseText);
-    for (const event of events) {
-      if (usageMetrics) {
-        break;
-      }
 
+    // Claude SSE 特殊处理：
+    // - message_start 包含 input tokens 和缓存创建字段（5m/1h 区分计费）
+    // - message_delta 包含最终的 output_tokens
+    // 需要分别提取并合并
+    let messageStartUsage: UsageMetrics | null = null;
+    let messageDeltaOutputTokens: number | null = null;
+
+    for (const event of events) {
       if (typeof event.data !== "object" || !event.data) {
         continue;
       }
 
       const data = event.data as Record<string, unknown>;
 
-      // Standard usage fields
-      applyUsageValue(data.usage, `sse.${event.event}.usage`);
-
-      // Gemini usageMetadata
-      applyUsageValue(data.usageMetadata, `sse.${event.event}.usageMetadata`);
-
-      // Handle response wrapping in SSE
-      if (!usageMetrics && data.response && typeof data.response === "object") {
-        const responseObj = data.response as Record<string, unknown>;
-        applyUsageValue(responseObj.usage, `sse.${event.event}.response.usage`);
-        applyUsageValue(responseObj.usageMetadata, `sse.${event.event}.response.usageMetadata`);
+      // Claude message_start format: data.message.usage
+      // 提取 input tokens 和缓存字段
+      if (event.event === "message_start" && data.message && typeof data.message === "object") {
+        const messageObj = data.message as Record<string, unknown>;
+        if (messageObj.usage && typeof messageObj.usage === "object") {
+          const extracted = extractUsageMetrics(messageObj.usage);
+          if (extracted) {
+            messageStartUsage = extracted;
+            logger.debug("[ResponseHandler] Extracted usage from message_start", {
+              source: "sse.message_start.message.usage",
+              usage: extracted,
+            });
+          }
+        }
       }
+
+      // Claude message_delta format: data.usage.output_tokens
+      // 提取最终的 output_tokens（在流结束时）
+      if (event.event === "message_delta" && data.usage && typeof data.usage === "object") {
+        const deltaUsage = data.usage as Record<string, unknown>;
+        if (typeof deltaUsage.output_tokens === "number") {
+          messageDeltaOutputTokens = deltaUsage.output_tokens;
+          logger.debug("[ResponseHandler] Extracted output_tokens from message_delta", {
+            source: "sse.message_delta.usage.output_tokens",
+            outputTokens: messageDeltaOutputTokens,
+          });
+        }
+      }
+
+      // 非 Claude 格式的 SSE 处理（Gemini 等）
+      if (!messageStartUsage && !messageDeltaOutputTokens) {
+        // Standard usage fields (data.usage)
+        applyUsageValue(data.usage, `sse.${event.event}.usage`);
+
+        // Gemini usageMetadata
+        applyUsageValue(data.usageMetadata, `sse.${event.event}.usageMetadata`);
+
+        // Handle response wrapping in SSE
+        if (!usageMetrics && data.response && typeof data.response === "object") {
+          const responseObj = data.response as Record<string, unknown>;
+          applyUsageValue(responseObj.usage, `sse.${event.event}.response.usage`);
+          applyUsageValue(responseObj.usageMetadata, `sse.${event.event}.response.usageMetadata`);
+        }
+      }
+    }
+
+    // 合并 Claude SSE 的 message_start 和 message_delta 数据
+    if (messageStartUsage) {
+      // 使用 message_delta 中的 output_tokens 覆盖 message_start 中的值
+      if (messageDeltaOutputTokens !== null) {
+        messageStartUsage.output_tokens = messageDeltaOutputTokens;
+        logger.debug(
+          "[ResponseHandler] Merged output_tokens from message_delta into message_start usage",
+          {
+            finalOutputTokens: messageDeltaOutputTokens,
+          }
+        );
+      }
+      usageMetrics = adjustUsageForProviderType(messageStartUsage, providerType);
+      usageRecord = messageStartUsage as unknown as Record<string, unknown>;
+      logger.debug("[ResponseHandler] Final merged usage from Claude SSE", {
+        providerType,
+        usage: usageMetrics,
+      });
     }
   }
 
@@ -1359,7 +1481,9 @@ async function updateRequestCostFromUsage(
   costMultiplier: number = 1.0
 ): Promise<void> {
   if (!usage) {
-    logger.warn("[CostCalculation] No usage data, skipping cost update", { messageId });
+    logger.warn("[CostCalculation] No usage data, skipping cost update", {
+      messageId,
+    });
     return;
   }
 
@@ -1499,16 +1623,34 @@ async function finalizeRequestStats(
   }
 
   // 4. 更新成本
+  const resolvedCacheTtl = usageMetrics.cache_ttl ?? session.getCacheTtlResolved?.() ?? null;
+  const cache5m =
+    usageMetrics.cache_creation_5m_input_tokens ??
+    (resolvedCacheTtl === "1h" ? undefined : usageMetrics.cache_creation_input_tokens);
+  const cache1h =
+    usageMetrics.cache_creation_1h_input_tokens ??
+    (resolvedCacheTtl === "1h" ? usageMetrics.cache_creation_input_tokens : undefined);
+  const cacheTotal =
+    usageMetrics.cache_creation_input_tokens ?? ((cache5m ?? 0) + (cache1h ?? 0) || undefined);
+
+  const normalizedUsage: UsageMetrics = {
+    ...usageMetrics,
+    cache_ttl: resolvedCacheTtl ?? usageMetrics.cache_ttl,
+    cache_creation_5m_input_tokens: cache5m,
+    cache_creation_1h_input_tokens: cache1h,
+    cache_creation_input_tokens: cacheTotal,
+  };
+
   await updateRequestCostFromUsage(
     messageContext.id,
     session.getOriginalModel(),
     session.getCurrentModel(),
-    usageMetrics,
+    normalizedUsage,
     provider.costMultiplier
   );
 
   // 5. 追踪消费到 Redis（用于限流）
-  await trackCostToRedis(session, usageMetrics);
+  await trackCostToRedis(session, normalizedUsage);
 
   // 6. 更新 session usage
   if (session.sessionId) {
@@ -1517,7 +1659,7 @@ async function finalizeRequestStats(
       const priceData = await findLatestPriceByModel(session.request.model);
       if (priceData?.priceData) {
         const cost = calculateRequestCost(
-          usageMetrics,
+          normalizedUsage,
           priceData.priceData,
           provider.costMultiplier
         );
@@ -1528,10 +1670,10 @@ async function finalizeRequestStats(
     }
 
     void SessionManager.updateSessionUsage(session.sessionId, {
-      inputTokens: usageMetrics.input_tokens,
-      outputTokens: usageMetrics.output_tokens,
-      cacheCreationInputTokens: usageMetrics.cache_creation_input_tokens,
-      cacheReadInputTokens: usageMetrics.cache_read_input_tokens,
+      inputTokens: normalizedUsage.input_tokens,
+      outputTokens: normalizedUsage.output_tokens,
+      cacheCreationInputTokens: normalizedUsage.cache_creation_input_tokens,
+      cacheReadInputTokens: normalizedUsage.cache_read_input_tokens,
       costUsd: costUsdStr,
       status: statusCode >= 200 && statusCode < 300 ? "completed" : "error",
       statusCode: statusCode,
@@ -1543,10 +1685,13 @@ async function finalizeRequestStats(
   // 7. 更新请求详情
   await updateMessageRequestDetails(messageContext.id, {
     statusCode: statusCode,
-    inputTokens: usageMetrics.input_tokens,
-    outputTokens: usageMetrics.output_tokens,
-    cacheCreationInputTokens: usageMetrics.cache_creation_input_tokens,
-    cacheReadInputTokens: usageMetrics.cache_read_input_tokens,
+    inputTokens: normalizedUsage.input_tokens,
+    outputTokens: normalizedUsage.output_tokens,
+    cacheCreationInputTokens: normalizedUsage.cache_creation_input_tokens,
+    cacheReadInputTokens: normalizedUsage.cache_read_input_tokens,
+    cacheCreation5mInputTokens: normalizedUsage.cache_creation_5m_input_tokens,
+    cacheCreation1hInputTokens: normalizedUsage.cache_creation_1h_input_tokens,
+    cacheTtlApplied: normalizedUsage.cache_ttl ?? null,
     providerChain: session.getProviderChain(),
     model: session.getCurrentModel() ?? undefined,
     providerId: session.provider?.id, // ⭐ 更新最终供应商ID（重试切换后）

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { Context } from "hono";
+import type { CacheTtlResolved } from "@/types/cache";
 import type { Key } from "@/types/key";
 import type { ProviderChainItem } from "@/types/message";
 import type { Provider, ProviderType } from "@/types/provider";
@@ -53,6 +54,9 @@ export class ProxySession {
   // Session ID（用于会话粘性和并发限流）
   sessionId: string | null;
 
+  // Request Sequence（Session 内请求序号）
+  requestSequence: number = 1;
+
   // 请求格式追踪：记录原始请求格式和供应商类型
   originalFormat: ClientFormat = "claude";
   providerType: ProviderType | null = null;
@@ -68,6 +72,9 @@ export class ProxySession {
 
   // 上次选择的决策上下文（用于记录到 providerChain）
   private _lastSelectionContext?: ProviderChainItem["decisionContext"];
+
+  // Cache TTL override (resolved)
+  private cacheTtlResolved: CacheTtlResolved | null = null;
 
   private constructor(init: {
     startTime: number;
@@ -162,6 +169,14 @@ export class ProxySession {
     }
   }
 
+  setCacheTtlResolved(ttl: CacheTtlResolved | null): void {
+    this.cacheTtlResolved = ttl;
+  }
+
+  getCacheTtlResolved(): CacheTtlResolved | null {
+    return this.cacheTtlResolved;
+  }
+
   /**
    * 设置原始请求格式（从路由层调用）
    */
@@ -181,6 +196,20 @@ export class ProxySession {
    */
   setSessionId(sessionId: string): void {
     this.sessionId = sessionId;
+  }
+
+  /**
+   * 设置请求序号（Session 内）
+   */
+  setRequestSequence(sequence: number): void {
+    this.requestSequence = sequence;
+  }
+
+  /**
+   * 获取请求序号（Session 内）
+   */
+  getRequestSequence(): number {
+    return this.requestSequence;
   }
 
   /**
@@ -286,6 +315,7 @@ export class ProxySession {
         | "retry_success"
         | "retry_failed" // 供应商错误（已计入熔断器）
         | "system_error" // 系统/网络错误（不计入熔断器）
+        | "resource_not_found" // 上游 404 错误（不计入熔断器，仅切换供应商）
         | "retry_with_official_instructions" // Codex instructions 自动重试（官方）
         | "retry_with_cached_instructions" // Codex instructions 智能重试（缓存）
         | "client_error_non_retryable" // 不可重试的客户端错误（Prompt 超限、内容过滤、PDF 限制、Thinking 格式）

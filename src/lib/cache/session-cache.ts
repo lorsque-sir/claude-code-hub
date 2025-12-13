@@ -107,6 +107,7 @@ const activeSessionsCache = new SessionCache<
     keyId: number;
     userAgent: string | null;
     apiType: string | null;
+    cacheTtlApplied: string | null;
   }>
 >(2);
 
@@ -130,6 +131,7 @@ const sessionDetailsCache = new SessionCache<{
   keyId: number;
   userAgent: string | null;
   apiType: string | null;
+  cacheTtlApplied: string | null;
 }>(1);
 
 /**
@@ -164,6 +166,27 @@ export function setSessionDetailsCache(
   data: Parameters<typeof sessionDetailsCache.set>[1]
 ) {
   sessionDetailsCache.set(sessionId, data);
+}
+
+/**
+ * 清空活跃 Sessions 的缓存
+ */
+export function clearActiveSessionsCache() {
+  activeSessionsCache.delete("active_sessions");
+}
+
+/**
+ * 清空所有 Sessions 的缓存（包括活跃和非活跃）
+ */
+export function clearAllSessionsCache() {
+  activeSessionsCache.delete("all_sessions");
+}
+
+/**
+ * 清空指定 Session 详情的缓存
+ */
+export function clearSessionDetailsCache(sessionId: string) {
+  sessionDetailsCache.delete(sessionId);
 }
 
 /**

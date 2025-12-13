@@ -4,6 +4,101 @@
 
 ---
 
+## [v0.3.29](https://github.com/ding113/claude-code-hub/releases/tag/v0.3.29) - 2025-12-12
+
+### 其他
+
+- 更新 LiteLLM 模型价格数据
+
+---
+
+## [v0.3.28](https://github.com/ding113/claude-code-hub/releases/tag/v0.3.28) - 2025-12-10
+
+### 新增
+
+- 日志页面新增快速日期筛选器（今日/昨日/近7天/近30天）和 CSV 导出功能 (#314)
+- Session 监控页面新增分页功能，支持分别对活跃和非活跃 Session 进行分页浏览 (#314)
+
+### 优化
+
+- 每日排行榜改用滚动 24 小时窗口计算，替代原先基于日历日的统计方式 (#314)
+- 上游 404 错误现在触发供应商故障切换而不计入熔断器，提升中转服务兼容性 (#314)
+
+### 修复
+
+- 修复 Anthropic SSE 流式响应中 output_tokens 提取问题，现在从 message_delta 事件正确获取 (#313)
+
+---
+
+## [v0.3.27](https://github.com/ding113/claude-code-hub/releases/tag/v0.3.27) - 2025-12-10
+
+### 新增
+
+- 供应商新增 IP 透传功能（`preserve_client_ip`），可将客户端 IP 传递给上游供应商 (#294) [@NightYuYyy](https://github.com/NightYuYyy)
+- 新增会话绑定清理工具 (`scripts/clear-session-bindings.ts`)，支持按优先级、ID、名称筛选清理 (#268) [@sususu98](https://github.com/sususu98)
+- 仪表盘新增计费详情展示功能
+
+### 优化
+
+- 用户管理 API 增强：改进验证逻辑和响应结构，支持更多字段 (#303) [@NightYuYyy](https://github.com/NightYuYyy)
+- 改进 Session 绑定清理工具的类型安全性 (#268) [@sususu98](https://github.com/sususu98)
+
+### 修复
+
+- 修复缓存创建 tokens（5 分钟/1 小时）和 TTL 未保存到数据库的问题，同时修复 React 渲染 bug (#310)
+- 修复从 Claude message_start SSE 事件中提取缓存创建 tokens 的问题
+- 添加 tool_use_id 错误规则并修复密钥供应商分组 bugs
+- 修复 key provider group 相关问题 (#296) [@Hwwwww-dev](https://github.com/Hwwwww-dev)
+- 修复 KeyListHeader 组件中 DialogContent 样式问题 (#295) [@Hwwwww-dev](https://github.com/Hwwwww-dev)
+- 解决应用 CORS 头时的 TypeError immutable 错误 (#292) [@sususu98](https://github.com/sususu98)
+- 修复点击同步规则时的错误 (#309) [@sususu98](https://github.com/sususu98)
+- 修复 my-usage 页面成本值的空值处理问题
+- 修复迁移索引缺少 IF NOT EXISTS 导致的幂等性问题
+
+### 其他
+
+- 更新 LiteLLM 价格数据
+- 多语言翻译更新（日语、俄语、简体中文、繁体中文）
+
+---
+
+## [v0.3.26](https://github.com/ding113/claude-code-hub/releases/tag/v0.3.26) - 2025-12-07
+
+### 新增
+
+- 新增个人使用页面 (my-usage)，用户可查看个人配额、使用日志和过期信息 (#282)
+- Session 内请求追踪功能，支持在 Session 详情页查看单个请求详情 (#289)
+- 批量终止活跃 Session 功能，管理员可在 Session 管理页批量终止 Session (#279) [@Silentely](https://github.com/Silentely)
+- 用户过期时间管理功能，支持设置用户账户过期日期 (#273) [@NightYuYyy](https://github.com/NightYuYyy)
+- Cache TTL 偏好设置，供应商和密钥管理支持配置缓存 TTL 偏好
+- 供应商分组功能，密钥可关联指定的供应商分组
+- 错误覆写支持多格式和异步规则检测 (#258) [@sususu98](https://github.com/sususu98)
+- 新增模型相关错误模式（输入/上下文限制等），增强错误识别和报告能力
+
+### 优化
+
+- 替换原生日期选择器为 shadcn/ui DatePickerField，提升日期选择体验
+- 个人使用页面筛选器与请求日志页面对齐，统一用户体验
+- 图表工具提示可见性改进，数据展示更清晰
+- 登录流程和权限管理增强，支持只读访问路径
+- Gemini 透传超时机制优化 + undici 超时配置 (#258) [@sususu98](https://github.com/sususu98)
+
+### 修复
+
+- 修复 CORS 预检请求返回 401 的问题 (#287) [@ylxmf2005](https://github.com/ylxmf2005)
+- 修复 Session 消息页面 URL locale 重复问题和响应体存储问题
+- 修复迁移索引创建缺少 IF NOT EXISTS 导致的重复创建错误
+- 修复用户 Schema 中 providerGroup 字段未设置 nullable 的问题
+- 修复代理转发器和供应商链格式化的错误处理
+- 修复日期筛选时区问题，使用毫秒时间戳确保准确性 (#274)
+
+### 其他
+
+- 更新 GitHub 工作流文件，改进 CI/CD 流程
+- 代码格式化更新
+
+---
+
 ## [v0.3.25](https://github.com/ding113/claude-code-hub/releases/tag/v0.3.25) - 2025-12-05
 
 ### 修复

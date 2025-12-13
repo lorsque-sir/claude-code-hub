@@ -1,4 +1,5 @@
 import type { Numeric } from "decimal.js-light";
+import type { CacheTtlApplied } from "./cache";
 
 /**
  * 供应商信息（用于决策链）
@@ -17,6 +18,7 @@ export interface ProviderChainItem {
     | "retry_success" // 重试成功
     | "retry_failed" // 重试失败（供应商错误，已计入熔断器）
     | "system_error" // 系统/网络错误（不计入熔断器）
+    | "resource_not_found" // 资源不存在（404），触发故障转移但不计入熔断器
     | "retry_with_official_instructions" // Codex instructions 自动重试（官方）
     | "retry_with_cached_instructions" // Codex instructions 智能重试（缓存）
     | "client_error_non_retryable" // 不可重试的客户端错误（Prompt 超限、内容过滤、PDF 限制、Thinking 格式）
@@ -78,6 +80,7 @@ export interface ProviderChainItem {
     system?: {
       errorType: string; // 如 "TypeError"
       errorName: string; // 如 "fetch failed"
+      errorMessage?: string; // 完整错误消息（如 "fetch failed: connect ETIMEDOUT 192.168.1.1:443"）
       errorCode?: string; // 如 "ENOTFOUND"
       errorSyscall?: string; // 如 "getaddrinfo"
       errorStack?: string; // 堆栈前3行
@@ -165,6 +168,9 @@ export interface MessageRequest {
   // Session ID（用于会话粘性和日志追踪）
   sessionId?: string;
 
+  // Request Sequence（Session 内请求序号）
+  requestSequence?: number;
+
   // 上游决策链（记录尝试的供应商列表）
   providerChain?: ProviderChainItem[];
 
@@ -179,6 +185,9 @@ export interface MessageRequest {
   outputTokens?: number;
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
+  cacheCreation5mInputTokens?: number;
+  cacheCreation1hInputTokens?: number;
+  cacheTtlApplied?: CacheTtlApplied | null;
 
   // 错误信息
   errorMessage?: string;
@@ -214,6 +223,9 @@ export interface CreateMessageRequestData {
   // Session ID（用于会话粘性和日志追踪）
   session_id?: string;
 
+  // Request Sequence（Session 内请求序号，用于区分同一 Session 的不同请求）
+  request_sequence?: number;
+
   // 上游决策链
   provider_chain?: ProviderChainItem[];
 
@@ -228,6 +240,9 @@ export interface CreateMessageRequestData {
   output_tokens?: number;
   cache_creation_input_tokens?: number;
   cache_read_input_tokens?: number;
+  cache_creation_5m_input_tokens?: number;
+  cache_creation_1h_input_tokens?: number;
+  cache_ttl_applied?: CacheTtlApplied | null;
 
   // 错误信息
   error_message?: string;

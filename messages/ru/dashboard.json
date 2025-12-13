@@ -74,7 +74,14 @@
       "minRetryCount": "Количество ретраев ≥",
       "minRetryCountPlaceholder": "Введите минимум (0 — без ограничения)",
       "apply": "Применить фильтр",
-      "reset": "Сброс"
+      "reset": "Сброс",
+      "last7days": "Последние 7 дней",
+      "last30days": "Последние 30 дней",
+      "customRange": "Произвольный диапазон",
+      "export": "Экспорт",
+      "exporting": "Экспорт...",
+      "exportSuccess": "Экспорт завершен",
+      "exportError": "Ошибка экспорта"
     },
     "columns": {
       "time": "Время",
@@ -172,8 +179,11 @@
       "clickStatusCode": "Нажмите на код состояния, чтобы просмотреть полную хронологию",
       "viewDetails": "Просмотр деталей",
       "reasons": {
-        "rateLimited": "Лимит затрат провайдера",
+        "rateLimited": "Лимит стоимости поставщика",
         "circuitOpen": "Размыкатель цепи открыт"
+      },
+      "billingDetails": {
+        "title": "Детали биллинга"
       }
     },
     "providerChain": {
@@ -190,6 +200,16 @@
       "401": "401 (Не авторизован)",
       "429": "429 (Ограничение)",
       "500": "500 (Ошибка сервера)"
+    },
+    "billingDetails": {
+      "input": "Входные",
+      "output": "Выходные",
+      "cacheWrite5m": "Запись кэша (5m)",
+      "cacheWrite1h": "Запись кэша (1h)",
+      "cacheRead": "Чтение кэша",
+      "cacheTtl": "TTL кэша",
+      "multiplier": "Множитель поставщика",
+      "totalCost": "Общая стоимость"
     }
   },
   "leaderboard": {
@@ -285,6 +305,9 @@
       "refreshing": "Обновление...",
       "noActiveSessions": "Нет активных сеансов"
     },
+    "pagination": {
+      "total": "всего"
+    },
     "details": {
       "title": "Сообщения сеанса",
       "messages": "Список сообщений",
@@ -305,6 +328,7 @@
       "totalInput": "Общий ввод",
       "totalOutput": "Общий вывод",
       "cacheCreation": "Создание кэша",
+      "cacheTtlMixed": "Смешанный",
       "cacheRead": "Чтение из кэша",
       "total": "Всего",
       "totalFee": "Общая плата",
@@ -325,7 +349,29 @@
       "copyMessages": "Копировать сообщения",
       "downloadMessages": "Скачать сообщения",
       "copied": "Скопировано",
-      "copyResponse": "Копировать тело ответа"
+      "copyResponse": "Копировать тело ответа",
+      "terminate": "Прервать",
+      "terminateTitle": "Прервать сессию",
+      "terminateDescription": "Вы уверены, что хотите прервать эту сессию? После прерывания привязка поставщика будет очищена, и следующий запрос выберет нового поставщика.",
+      "sessionIdLabel": "ID сессии: {sessionId}",
+      "cancel": "Отмена",
+      "confirmTerminate": "Прервать",
+      "terminating": "Прерывание...",
+      "terminateSuccess": "Сессия успешно прервана",
+      "terminateFailed": "Не удалось прервать сессию",
+      "terminateSelected": "Прервать выбранные",
+      "selectedCount": "Выбрано: {count}",
+      "selectAll": "Выбрать все",
+      "selectSessionLabel": "Выбрать сессию",
+      "multiSelect": "Множественный выбор",
+      "cancelMultiSelect": "Отмена",
+      "terminateSessionTitle": "Прервать сессию",
+      "terminateSessionDescription": "Вы уверены, что хотите прервать эту сессию? Это действие нельзя отменить.",
+      "batchTerminateSuccess": "Прервано {count} сессий",
+      "batchTerminatePartial": "Без прав: {unauthorized} · Отсутствуют: {missing}",
+      "batchTerminateAllowedFailed": "Не удалось прервать {count} разрешённых сессий",
+      "batchTerminateNone": "Не удалось прервать ни одной сессии",
+      "noSelection": "Выберите хотя бы одну сессию"
     },
     "status": {
       "loading": "Загрузка...",
@@ -337,6 +383,14 @@
     },
     "errors": {
       "copyFailed": "Не удалось скопировать"
+    },
+    "requestList": {
+      "title": "Список запросов",
+      "noRequests": "Запросы не найдены",
+      "fetchFailed": "Не удалось получить список запросов",
+      "unknownError": "Неизвестная ошибка",
+      "prev": "Назад",
+      "next": "Вперед"
     },
     "back": "Назад",
     "loadingError": "Не удалось загрузить"
@@ -479,6 +533,26 @@
     "badge": "{count} ключей",
     "activeKeys": "Активные ключи",
     "totalKeys": "Всего ключей",
+    "expiresAt": "Срок действия",
+    "status": {
+      "active": "Активен",
+      "expiringSoon": "Скоро истечет",
+      "expired": "Истек",
+      "disabled": "Отключен"
+    },
+    "actions": {
+      "renew": "Продлить",
+      "renew30d": "Продлить на 30 дней",
+      "renew90d": "Продлить на 90 дней",
+      "renew1y": "Продлить на 1 год",
+      "renewCustom": "Настроить...",
+      "customPrompt": "Введите новую дату истечения (ГГГГ-ММ-ДД). Оставьте пустым для отмены.",
+      "invalidDate": "Пожалуйста, введите действительную дату",
+      "enable": "Включить",
+      "disable": "Отключить",
+      "success": "Операция выполнена успешно",
+      "failed": "Операция не удалась, попробуйте еще раз"
+    },
     "emptyState": {
       "title": "Нет пользователей",
       "description": "Вы еще не создали ни одного пользователя. Пользователи являются основой для управления API-ключами и квотами использования. Создайте первого пользователя, чтобы начать!",
